@@ -1,3 +1,5 @@
+import base64
+import gzip
 import re
 from dataclasses import dataclass
 
@@ -6,19 +8,17 @@ from lxml import etree
 import config
 import utils
 
-etran_request = r"""
+etran_request = rf"""
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:sys="SysEtranInt">
 <soapenv:Body>
     <sys:GetBlock>
-        <Login>{etran_login}</Login>
-        <Password>{etran_password}</Password>
-        <Text>{0}</Text>
+        <Login>{config.etran_login}</Login>
+        <Password>{config.etran_password}</Password>
+        <Text>{{0}}</Text>
     </sys:GetBlock>
 </soapenv:Body>
 </soapenv:Envelope>
 """
-etran_request = etran_request.format(
-    '{0}', etran_login=config.etran_login, etran_password=config.etran_password)
 
 train_index_pattern1 = re.compile(r'(\d{5})(?:\D)(\d{3})(?:\D)(\d{5})')
 train_index_pattern2 = re.compile(r'(?:\d{15})')
@@ -44,8 +44,14 @@ def decode_response(response: bytes) -> ETRANResponse:
 
         if root.tag == 'error':
             is_error, text = True, root.find('errorMessage').get('value')
+
         elif root.tag in {'GetInformReply', 'GetInformNSIReply'}:
-            xml = root.findtext('ASOUPReply').encode()
+            if reply := root.findtext('ASOUPReply'):
+                xml = reply.encode()
+            else:
+                reply = root.findtext('ASOUP64Reply').encode()
+                xml = gzip.decompress(base64.b64decode(reply))
+
             # GetInformReply/ASOUPReply/Envelope/Body/getReferenceSPVXXXXResponse/return
             root = etree.fromstring(xml, parser)[0][0][0]
             if root.findtext('returnCode') != '0':
@@ -55,8 +61,10 @@ def decode_response(response: bytes) -> ETRANResponse:
                 root.tag = 'root'
                 text = etree.tostring(root, encoding='UTF-8').decode()
                 text = xmlns_pattern.sub('<root>', text, 1)
+
         else:  # getNSIReply, getOrgPassportReply, etc.
             text = etree.tostring(root, encoding='UTF-8').decode()
+
     except etree.XMLSyntaxError as e:
         is_error, text = True, repr(e)
     finally:
@@ -65,12 +73,12 @@ def decode_response(response: bytes) -> ETRANResponse:
 
 def request_SPP4700(query: str) -> str:
     """Работа с поездом"""
-    request_template = r"""
-<GetInform>
+    request_template = rf"""
+<GetInform>{"<UseGZIPBinary>1</UseGZIPBinary>" if config.etran_gzip else ""}
 <ns0:getReferenceSPP4700 xmlns:ns0="http://service.siw.pktbcki.rzd/">
 <ns0:ReferenceSPP4700Request>
 <idUser>0</idUser>
-<indexPoezd>{0}</indexPoezd>
+<indexPoezd>{{0}}</indexPoezd>
 </ns0:ReferenceSPP4700Request>
 </ns0:getReferenceSPP4700>
 </GetInform>
