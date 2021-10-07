@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import sys
 import time
 from dataclasses import dataclass
 
@@ -239,8 +238,10 @@ def terminate():
 
 
 logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
-                    level=logging.DEBUG if '--debug' in sys.argv else logging.WARNING, filename='main.log', encoding='utf-8')
-logging.getLogger().addHandler(logging.StreamHandler())
+                    level=logging.DEBUG if config.DEBUG else logging.WARNING,
+                    filename='main.log', encoding='utf-8')
+if config.DEBUG:
+    logging.getLogger().addHandler(logging.StreamHandler())
 
 try:
     logging.warning('app start')

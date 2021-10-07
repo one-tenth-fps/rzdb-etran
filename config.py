@@ -9,6 +9,7 @@ SLEEP_ON_DISCONNECT = config['app']['SLEEP_ON_DISCONNECT']
 SLEEP_ON_DOS = config['app']['SLEEP_ON_DOS']
 SLEEP_ON_DOS_MAX = config['app']['SLEEP_ON_DOS_MAX']
 DB_POLLING_INTERVAL = config['app']['DB_POLLING_INTERVAL']
+DEBUG = config['app']['DEBUG']
 
 db_driver = config['db']['driver']
 db_server = config['db']['server']
@@ -21,5 +22,3 @@ etran_login = config['etran']['login']
 etran_password = config['etran']['password']
 etran_url = config['etran']['url']
 etran_headers = config['etran']['headers']
-
-#etran_url = 'http://httpbin.org/post'
