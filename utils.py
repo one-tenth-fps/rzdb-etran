@@ -40,7 +40,7 @@ async def rerun_on_exception(coro, *args, sleep_for=0, **kwargs):
             raise
         except RerunMeException as e:
             logging.warning(
-                f"reruning {coro.__name__} after {sleep_for}s sleep because of {repr(e)}"
+                f"rerunning {coro.__name__} after {sleep_for}s sleep because of {repr(e)}"
             )
             if sleep_for > 0:
                 await asyncio.sleep(sleep_for)
