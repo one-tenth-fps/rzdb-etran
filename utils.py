@@ -1,6 +1,6 @@
 import asyncio
-from asyncio.tasks import gather
 import logging
+
 
 class CancellableSleep:
     """Обёртка asyncio.sleep, позволяющая прерывать сон"""
@@ -40,13 +40,19 @@ async def rerun_on_exception(coro, *args, sleep_for=0, **kwargs):
             raise
         except RerunMeException as e:
             logging.warning(
-                f'reruning {coro.__name__} after {sleep_for}s sleep because of {repr(e)}')
+                f"reruning {coro.__name__} after {sleep_for}s sleep because of {repr(e)}"
+            )
             if sleep_for > 0:
                 await asyncio.sleep(sleep_for)
 
 
 def xml_escape(val: str) -> str:
-    return val.replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", "&apos;")
+    return (
+        val.replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&apos;")
+    )
 
 
 def get_code6(val: int) -> str:
@@ -65,5 +71,5 @@ def get_code6(val: int) -> str:
         digit = s % 11
         if digit == 10:
             digit = 0
-    n = val*10 + digit
-    return f'{n:06d}'
+    n = val * 10 + digit
+    return f"{n:06d}"

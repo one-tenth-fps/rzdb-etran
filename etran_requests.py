@@ -20,9 +20,9 @@ etran_request = rf"""
 </soapenv:Envelope>
 """
 
-train_index_pattern1 = re.compile(r'(\d{5})(?:\D)(\d{3})(?:\D)(\d{5})')
-train_index_pattern2 = re.compile(r'(?:\d{15})')
-xmlns_pattern = re.compile(r'(?:<root.*?>)')  # убираем мусорные namespace'ы
+train_index_pattern1 = re.compile(r"(\d{5})(?:\D)(\d{3})(?:\D)(\d{5})")
+train_index_pattern2 = re.compile(r"(?:\d{15})")
+xmlns_pattern = re.compile(r"(?:<root.*?>)")  # убираем мусорные namespace'ы
 
 
 @dataclass
@@ -40,32 +40,32 @@ def decode_response(response: bytes) -> ETRANResponse:
         root = etree.fromstring(response)
 
         # Envelope/Body/GetBlockResponse/Text
-        xml = root[0][0].findtext('Text').encode()
+        xml = root[0][0].findtext("Text").encode()
         root = etree.fromstring(xml, parser)
 
-        if root.tag == 'error':
+        if root.tag == "error":
             is_error = True
-            text = f'{root.find("errorStatusCode").get("value")} {root.find("errorMessage").get("value")}'
+            text = f"{root.find('errorStatusCode').get('value')} {root.find('errorMessage').get('value')}"
 
-        elif root.tag in {'GetInformReply', 'GetInformNSIReply'}:
-            if reply := root.findtext('ASOUPReply'):
+        elif root.tag in {"GetInformReply", "GetInformNSIReply"}:
+            if reply := root.findtext("ASOUPReply"):
                 xml = reply.encode()
             else:
-                reply = root.findtext('ASOUP64Reply').encode()
+                reply = root.findtext("ASOUP64Reply").encode()
                 xml = gzip.decompress(base64.b64decode(reply))
 
             # GetInformReply/ASOUPReply/Envelope/Body/getReferenceSPVXXXXResponse/return
             root = etree.fromstring(xml, parser)[0][0][0]
-            if root.findtext('returnCode') != '0':
-                is_error, text = True, root.findtext('errorMessage')
+            if root.findtext("returnCode") != "0":
+                is_error, text = True, root.findtext("errorMessage")
             else:
                 root = root[0]  # referenceSPVXXXX
-                root.tag = 'root'
-                text = etree.tostring(root, encoding='UTF-8').decode()
-                text = xmlns_pattern.sub('<root>', text, 1)
+                root.tag = "root"
+                text = etree.tostring(root, encoding="UTF-8").decode()
+                text = xmlns_pattern.sub("<root>", text, 1)
 
         else:  # getNSIReply, getOrgPassportReply, etc.
-            text = etree.tostring(root, encoding='UTF-8').decode()
+            text = etree.tostring(root, encoding="UTF-8").decode()
 
     except etree.XMLSyntaxError as e:
         is_error, text = True, repr(e)
@@ -86,16 +86,17 @@ def request_SPP4700(query: str) -> str:
 </GetInform>
     """
     if m := train_index_pattern1.fullmatch(query):
-        train_index = utils.get_code6(
-            int(m.group(1))) + m.group(2) + utils.get_code6(int(m.group(3)))
+        train_index = (
+            f"{utils.get_code6(int(m.group(1)))}"
+            f"{m.group(2)}"
+            f"{utils.get_code6(int(m.group(3)))}"
+        )
     elif train_index_pattern2.fullmatch(query):
         train_index = query
     else:
-        raise ValueError(f'Некорректный формат индекса поезда: {query}')
+        raise ValueError(f"Некорректный формат индекса поезда: {query}")
 
     return etran_request.format(utils.xml_escape(request_template.format(train_index)))
 
 
-request_map = {
-    1: request_SPP4700
-}
+request_map = {1: request_SPP4700}
