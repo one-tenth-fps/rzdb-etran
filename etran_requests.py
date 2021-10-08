@@ -34,16 +34,18 @@ class ETRANResponse:
 def decode_response(response: bytes) -> ETRANResponse:
     is_error, text = False, None
     try:
-        # во внутреннем XML ошибочно указывается кодировка windows-1251
+        # во внутреннем XML ошибочно указывается кодировка Windows-1251
         parser = etree.XMLParser(encoding="UTF-8")
-        root = etree.fromstring(response, parser)
+        # внешний XML может быть как UTF-8, так и Windows-1251, кодировка указывается верно
+        root = etree.fromstring(response)
 
         # Envelope/Body/GetBlockResponse/Text
         xml = root[0][0].findtext('Text').encode()
         root = etree.fromstring(xml, parser)
 
         if root.tag == 'error':
-            is_error, text = True, root.find('errorMessage').get('value')
+            is_error = True
+            text = f'{root.find("errorStatusCode").get("value")} {root.find("errorMessage").get("value")}'
 
         elif root.tag in {'GetInformReply', 'GetInformNSIReply'}:
             if reply := root.findtext('ASOUPReply'):

@@ -71,7 +71,8 @@ async def producer_db(queue_in, queue_out):
                         await queue_in.put(request_packet)
 
                 # цикл работы producer'а закончился; засыпаем, чтобы не тиранить БД
-                sleep_for = config.DB_QUERYING_INTERVAL if len(rows) > 0 else config.DB_POLLING_INTERVAL
+                sleep_for = config.DB_QUERYING_INTERVAL if len(
+                    rows) > 0 else config.DB_POLLING_INTERVAL
                 logging.info(
                     f'{task_name} going to sleep for {sleep_for}s')
                 await db_polling_sleep.sleep(sleep_for)
@@ -96,6 +97,7 @@ async def producer_db(queue_in, queue_out):
 
 async def worker(queue_in, queue_out):
     """ Разбирает очередь запросов queue_in, отправляет их в ЭТРАН, помещает ответы в queue_out"""
+    global etran_is_down
     task_name = asyncio.current_task().get_name()
 
     conn = aiohttp.TCPConnector(ttl_dns_cache=300)
@@ -105,11 +107,15 @@ async def worker(queue_in, queue_out):
             request_id = request_packet.request_id
 
             # делаем инкрементальную паузу, если запрос повторно оказался в очереди из-за ошибки отказа в обслуживании
-            sleep_for = min(request_packet.dos_counter *
-                            config.SLEEP_ON_DOS, config.SLEEP_ON_DOS_MAX)
+            if etran_is_down:
+                sleep_for = config.SLEEP_ON_DOS_MAX
+            else:
+                sleep_for = min(request_packet.dos_counter *
+                                config.SLEEP_ON_DOS, config.SLEEP_ON_DOS_MAX)
             if sleep_for > 0:
                 logging.warning(
-                    f'{task_name} id={request_id} going to sleep for {sleep_for}s because of DoS')
+                    f'{task_name} id={request_id} going to sleep for {sleep_for}s '
+                    f'because of {"an outage" if etran_is_down else "DoS"}')
                 await asyncio.sleep(sleep_for)
 
             try:
@@ -117,6 +123,9 @@ async def worker(queue_in, queue_out):
                 async with session.post(config.etran_url, data=request_packet.body,
                                         headers=config.etran_headers) as response:
                     response_body = await response.read()
+
+                    # with open("dump.xml", 'wb') as f:
+                    #     f.write(response_body)
 
                     # отправляем в очередь обработки ответов # TODO: пустое тело ответа?
                     logging.info(f'{task_name} id={request_id}'
@@ -132,7 +141,8 @@ async def worker(queue_in, queue_out):
             except aiohttp.ClientError as e:
                 # в случае сетевой ошибки возвращаем запрос в очередь и делаем паузу
                 logging.warning(
-                    f'{task_name} going to sleep for {config.SLEEP_ON_DISCONNECT}s because of {repr(e)}')
+                    f'{task_name} id={request_id} going to sleep for '
+                    f'{config.SLEEP_ON_DISCONNECT}s because of {repr(e)}')
                 await queue_in.put(request_packet)
                 await asyncio.sleep(config.SLEEP_ON_DISCONNECT)
 
@@ -142,6 +152,7 @@ async def worker(queue_in, queue_out):
 
 async def consumer_db(queue_in, queue_out):
     """ Разбирает очередь ответов queue_out, записывает результаты в БД """
+    global etran_is_down
     task_name = 'consumer'
 
     db_conn = await aioodbc.connect(dsn=config.db_connection_string, autocommit=True)
@@ -162,15 +173,17 @@ async def consumer_db(queue_in, queue_out):
                         response_packet.body)
                     response_is_error, response_text = etran_response.is_error, etran_response.text
 
-                if response_is_error and response_packet.request_packet is not None \
-                        and response_text.startswith('Дождитесь окончания предыдущего запроса от'):
+                if response_is_error and response_text.startswith('504'):
+                    # возвращаем запрос в очередь и приостанавливаем обработку новых в случае остановки ЭТРАН
+                    etran_is_down, return_to_queue = True, True
+                elif response_is_error and response_packet.request_packet is not None \
+                        and response_text.startswith('400 Дождитесь окончания предыдущего запроса от'):
                     # возвращаем запрос в очередь в случае ошибки отказа в обслуживании
-                    logging.warning(f'{task_name} id={request_id} returning '
-                                    f'into the queue because of {response_text}')
+                    etran_is_down, return_to_queue = False, True
                     response_packet.request_packet.dos_counter += 1
-                    await queue_in.put(response_packet.request_packet)
                 else:
                     # записываем ответ в БД
+                    etran_is_down, return_to_queue = False, False
                     logging.info(
                         f'{task_name} id={request_id} is_error={response_is_error} len={len(response_text)}'
                         f'{f" error: {response_text}" if response_is_error else ""}')
@@ -178,6 +191,11 @@ async def consumer_db(queue_in, queue_out):
                         response_text = f'<root>{response_text}</root>'
                     await db_cursor.execute('EXEC etran.SetRequestResponse @RequestID=?, @IsError=?, @Response=?',
                                             request_id, response_is_error, response_text)
+
+                if return_to_queue:
+                    logging.warning(f'{task_name} id={request_id} returning '
+                                    f'into the queue because of {response_text}')
+                    await queue_in.put(response_packet.request_packet)
 
             except pyodbc.Error as e:
                 # возвращаем ответ в очередь и перезапускаем consumer'а, если соединение с БД прервалось
@@ -206,7 +224,7 @@ async def main():
     global workers
     global consumers
 
-    # эндойнт, за который можно дёрнуть, чтобы разбудить продюсера
+    # HTTP-сервер для получения внешних команд
     web_server = web.Server(web_handler)
     web_runner = web.ServerRunner(web_server)
     await web_runner.setup()
@@ -235,6 +253,7 @@ async def main():
 
 
 async def web_handler(request):
+    # эндоинт, за который можно дёрнуть, чтобы разбудить продюсера
     if request.path == '/wakeup':
         logging.info('waking up the producer')
         db_polling_sleep.cancel_all()
@@ -269,6 +288,7 @@ if __name__ == '__main__':
     producers = []
     workers = []
     consumers = []
+    etran_is_down = False
 
     try:
         logging.warning('app start')
