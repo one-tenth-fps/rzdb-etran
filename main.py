@@ -1,19 +1,17 @@
 import asyncio
 import logging
+import signal
 import time
 from dataclasses import dataclass
 
 import aiohttp
 import aioodbc
 import pyodbc
+from aiohttp import web
 
-import etran_requests
 import config
+import etran_requests
 import utils
-
-producers = []
-workers = []
-consumers = []
 
 
 @dataclass(order=True)
@@ -73,9 +71,10 @@ async def producer_db(queue_in, queue_out):
                         await queue_in.put(request_packet)
 
                 # цикл работы producer'а закончился; засыпаем, чтобы не тиранить БД
+                sleep_for = config.DB_QUERYING_INTERVAL if len(rows) > 0 else config.DB_POLLING_INTERVAL
                 logging.info(
-                    f'{task_name} going to sleep for {config.DB_POLLING_INTERVAL}s')
-                await asyncio.sleep(config.DB_POLLING_INTERVAL)
+                    f'{task_name} going to sleep for {sleep_for}s')
+                await db_polling_sleep.sleep(sleep_for)
 
             except pyodbc.Error as e:
                 # перезапускаем producer'а, если соединение с БД прервалось
@@ -207,6 +206,13 @@ async def main():
     global workers
     global consumers
 
+    # эндойнт, за который можно дёрнуть, чтобы разбудить продюсера
+    web_server = web.Server(web_handler)
+    web_runner = web.ServerRunner(web_server)
+    await web_runner.setup()
+    web_site = web.TCPSite(web_runner, 'localhost', config.HTTP_ENDPOINT_PORT)
+    await web_site.start()
+
     # при запуске сбрасываем статусы всем ранее взятым, но не обработанным записям
     async with aioodbc.connect(dsn=config.db_connection_string, autocommit=True) as db_conn:
         async with db_conn.cursor() as db_cursor:
@@ -228,7 +234,15 @@ async def main():
     await asyncio.gather(*consumers)
 
 
+async def web_handler(request):
+    if request.path == '/wakeup':
+        logging.info('waking up the producer')
+        db_polling_sleep.cancel_all()
+    return web.Response(text="OK")
+
+
 def terminate():
+    db_polling_sleep.cancel_all()
     for t in producers:
         t.cancel()
     for t in workers:
@@ -237,16 +251,29 @@ def terminate():
         t.cancel()
 
 
-logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
-                    level=logging.DEBUG if config.DEBUG else logging.WARNING,
-                    filename='main.log', encoding='utf-8')
-if config.DEBUG:
-    logging.getLogger().addHandler(logging.StreamHandler())
+def signal_handler(sig, frame):
+    db_polling_sleep._terminate = True
+    raise KeyboardInterrupt
 
-try:
-    logging.warning('app start')
-    asyncio.run(main())
-except KeyboardInterrupt as e:
-    logging.warning('KeyboardInterrupt')
-finally:
-    terminate()
+
+if __name__ == '__main__':
+    logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
+                        level=logging.DEBUG if config.DEBUG else logging.WARNING,
+                        filename='main.log', encoding='utf-8')
+    if config.DEBUG:
+        logging.getLogger().addHandler(logging.StreamHandler())
+
+    db_polling_sleep = utils.CancellableSleep()
+    signal.signal(signal.SIGINT, signal_handler)
+
+    producers = []
+    workers = []
+    consumers = []
+
+    try:
+        logging.warning('app start')
+        asyncio.run(main())
+    except KeyboardInterrupt as e:
+        logging.warning('KeyboardInterrupt')
+    finally:
+        terminate()

@@ -1,5 +1,30 @@
 import asyncio
+from asyncio.tasks import gather
 import logging
+
+class CancellableSleep:
+    """Обёртка asyncio.sleep, позволяющая прерывать сон"""
+
+    def __init__(self):
+        self.tasks = set()
+        self._terminate = False
+
+    async def sleep(self, delay, result=None):
+        task = asyncio.create_task(asyncio.sleep(delay, result))
+        self.tasks.add(task)
+        try:
+            return await task
+        except asyncio.CancelledError as e:
+            if self._terminate:
+                raise
+            else:
+                return result
+        finally:
+            self.tasks.remove(task)
+
+    def cancel_all(self):
+        for t in self.tasks:
+            t.cancel()
 
 
 class RerunMeException(Exception):
@@ -7,13 +32,15 @@ class RerunMeException(Exception):
 
 
 async def rerun_on_exception(coro, *args, sleep_for=0, **kwargs):
+    """Обёртка корутины, перезапускающая её, поймав RerunMeException"""
     while True:
         try:
             await coro(*args, **kwargs)
         except asyncio.CancelledError:
             raise
         except RerunMeException as e:
-            logging.warning(f'reruning {coro.__name__} after {sleep_for}s sleep because of {repr(e)}')
+            logging.warning(
+                f'reruning {coro.__name__} after {sleep_for}s sleep because of {repr(e)}')
             if sleep_for > 0:
                 await asyncio.sleep(sleep_for)
 
