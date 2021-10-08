@@ -41,7 +41,7 @@ async def producer_db(queue_in, queue_out):
     try:
         while True:
             try:
-                await db_cursor.execute('EXEC etran.GetRequestsQueue @MaxCount=?', config.QUEUE_MAXSIZE)
+                await db_cursor.execute('EXEC etran.GetRequestQueue @MaxCount=?', config.QUEUE_MAXSIZE)
                 # забираем все записи, чтобы не держать курсор, если очередь заполнится
                 rows = await db_cursor.fetchall()
                 for row in rows:
@@ -216,7 +216,7 @@ async def main():
     # при запуске сбрасываем статусы всем ранее взятым, но не обработанным записям
     async with aioodbc.connect(dsn=config.db_connection_string, autocommit=True) as db_conn:
         async with db_conn.cursor() as db_cursor:
-            await db_cursor.execute('EXEC etran.ResetRequestsStatuses')
+            await db_cursor.execute('EXEC etran.ResetRequestStatuses')
 
     queue_in = asyncio.PriorityQueue(maxsize=config.QUEUE_MAXSIZE)
     queue_out = asyncio.Queue()
@@ -275,5 +275,8 @@ if __name__ == '__main__':
         asyncio.run(main())
     except KeyboardInterrupt as e:
         logging.warning('KeyboardInterrupt')
+    except Exception as e:
+        logging.error(f'{repr(e)}')
+        raise
     finally:
         terminate()
