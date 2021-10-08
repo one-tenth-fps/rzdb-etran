@@ -7,7 +7,7 @@ class CancellableSleep:
 
     def __init__(self):
         self.tasks = set()
-        self._terminate = False
+        self.terminate = False
 
     async def sleep(self, delay, result=None):
         task = asyncio.create_task(asyncio.sleep(delay, result))
@@ -15,7 +15,7 @@ class CancellableSleep:
         try:
             return await task
         except asyncio.CancelledError as e:
-            if self._terminate:
+            if self.terminate:
                 raise
             else:
                 return result

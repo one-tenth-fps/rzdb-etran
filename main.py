@@ -252,7 +252,7 @@ def terminate():
 
 
 def signal_handler(sig, frame):
-    db_polling_sleep._terminate = True
+    db_polling_sleep.terminate = True
     raise KeyboardInterrupt
 
 
