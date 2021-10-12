@@ -184,8 +184,9 @@ async def consumer_db(queue_in, queue_out):
 
     try:
         while True:
-            response_packet = await queue_out.get()
             try:
+                response_packet = await queue_out.get()
+
                 request_id = response_packet.request_id
                 if response_is_error := response_packet.is_error:
                     # ошибка напрямую из producer'а
@@ -205,7 +206,7 @@ async def consumer_db(queue_in, queue_out):
                     response_is_error
                     and response_packet.request_packet is not None
                     and response_text.startswith(
-                        "400 Дождитесь окончания предыдущего запроса от"
+                        "400 Дождитесь окончания предыдущего запроса"
                     )
                 ):
                     # возвращаем запрос в очередь в случае ошибки отказа в обслуживании
@@ -230,7 +231,7 @@ async def consumer_db(queue_in, queue_out):
                 if return_to_queue:
                     logging.warning(
                         f"{task_name} id={request_id} returning "
-                        f"into the queue because of {response_text}"
+                        f"to the queue because of {response_text}"
                     )
                     await queue_in.put(response_packet.request_packet)
 
@@ -286,7 +287,7 @@ async def main():
         )
     ]
     workers = [
-        asyncio.create_task(worker(queue_in, queue_out), name=f"worker-{i}")
+        asyncio.create_task(worker(queue_in, queue_out), name=f"worker-{i+1}")
         for i in range(config.WORKERS_COUNT)
     ]
     consumers = [
