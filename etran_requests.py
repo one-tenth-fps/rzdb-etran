@@ -170,5 +170,5 @@ request_map = {
     1: request_SPP4700,
     100: request_CarNSI,
     101: request_OrgPassport,
-    101: request_OrgPayers,
+    102: request_OrgPayers,
 }
