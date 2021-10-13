@@ -156,7 +156,7 @@ def request_OrgPayers(query: str) -> str:
     request_template = r"""
 <getOrganizationPayers version="1.0">
 <OrgId value="{0}"/>
-</getOrgPassport>
+</getOrganizationPayers>
     """
 
     if digits_pattern.fullmatch(query):
