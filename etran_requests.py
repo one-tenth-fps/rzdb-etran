@@ -106,6 +106,40 @@ def request_SPP4700(query: str) -> str:
     return etran_request.format(utils.xml_escape(request_template.format(train_index)))
 
 
+def request_SPV4659(query: str) -> str:
+    """Техническое состояние вагонов"""
+
+    request_template = rf"""
+<GetInform>{"<UseGZIPBinary>1</UseGZIPBinary>" if config.etran_gzip else ""}
+<ns0:getReferenceSPV4659 xmlns:ns0="http://service.siw.pktbcki.rzd/">
+<ns0:ReferenceSPV4659Request>
+<idUser>0</idUser>
+<vagons>{{0}}</vagons>
+</ns0:ReferenceSPV4659Request>
+</ns0:getReferenceSPV4659>
+</GetInform>
+    """
+    values = []
+
+    for value in (value.strip() for value in query.split(",")):
+        if len(value) > 0:
+            if carnumber_pattern.fullmatch(value):
+                values.append(int(value))
+            else:
+                raise ValueError(f"Некорректный номер вагона: {value}")
+
+    if len(values) > 0:
+        return etran_request.format(
+            utils.xml_escape(
+                request_template.format(
+                    "".join(f"<vagon>{value}</vagon>" for value in values)
+                )
+            )
+        )
+    else:
+        raise ValueError(f"Некорректный запрос: {query}")
+
+
 def request_CarNSI(query: str) -> str:
     """НСИ вагона (АБД ПВ)"""
 
@@ -168,6 +202,7 @@ def request_OrgPayers(query: str) -> str:
 # маппинг типов запросов в функции формирования их текста
 request_map = {
     1: request_SPP4700,
+    2: request_SPV4659,
     100: request_CarNSI,
     101: request_OrgPassport,
     102: request_OrgPayers,
