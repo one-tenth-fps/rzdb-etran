@@ -264,6 +264,7 @@ async def main():
     global producers
     global workers
     global consumers
+    global assistants
 
     # HTTP-сервер для получения внешних команд
     web_server = web.Server(web_handler)
@@ -300,6 +301,7 @@ async def main():
             )
         )
     ]
+    assistants = [asyncio.create_task(heartbeat())]
 
     await asyncio.gather(*producers)
     await queue_in.join()
@@ -315,6 +317,13 @@ async def web_handler(request):
     return web.Response(text="OK")
 
 
+async def heartbeat():
+    while True:
+        with open(config.HEARTBEAT_PATH, "w") as f:
+            f.write("")
+        await asyncio.sleep(config.HEARTBEAT_INTERVAL)
+
+
 def terminate():
     db_polling_sleep.cancel_all()
     for t in producers:
@@ -322,6 +331,8 @@ def terminate():
     for t in workers:
         t.cancel()
     for t in consumers:
+        t.cancel()
+    for t in assistants:
         t.cancel()
 
 
@@ -346,6 +357,7 @@ if __name__ == "__main__":
     producers = []
     workers = []
     consumers = []
+    assistants = []
     etran_is_down = False
 
     try:
