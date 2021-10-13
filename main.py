@@ -113,8 +113,11 @@ async def worker(queue_in, queue_out):
     global etran_is_down
     task_name = asyncio.current_task().get_name()
 
-    conn = aiohttp.TCPConnector(ttl_dns_cache=300)
-    async with aiohttp.ClientSession(connector=conn, raise_for_status=True) as session:
+    async with aiohttp.ClientSession(
+        connector=aiohttp.TCPConnector(ttl_dns_cache=300),
+        timeout=aiohttp.ClientTimeout(total=config.REQUEST_TIMEOUT),
+        raise_for_status=True,
+    ) as session:
         while True:
             request_packet = await queue_in.get()
             request_id = request_packet.request_id
