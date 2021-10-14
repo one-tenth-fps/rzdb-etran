@@ -57,12 +57,12 @@ def decode_response(response: bytes) -> ETRANResponse:
                 reply = root.findtext("ASOUP64Reply").encode()
                 xml = gzip.decompress(base64.b64decode(reply))
 
-            # GetInformReply/ASOUPReply/Envelope/Body/getReferenceSPVXXXXResponse/return
+            # GetInformReply/ASOUPReply/Envelope/Body/getReferenceSPXXXXXResponse/return
             root = etree.fromstring(xml, parser)[0][0][0]
             if root.findtext("returnCode") != "0":
                 is_error, text = True, root.findtext("errorMessage")
             else:
-                # referenceSPVXXXX
+                # referenceSPXXXXX
                 root = root[0]
                 root.tag = "root"
                 text = etree.tostring(root, encoding="UTF-8").decode()
