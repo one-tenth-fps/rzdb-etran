@@ -25,6 +25,7 @@ train_index_pattern2 = re.compile(r"(?:\d{15})")
 xmlns_pattern = re.compile(r"(?:<root.*?>)")
 digits_pattern = re.compile(r"(?:\d+)")
 carnumber_pattern = re.compile(r"(?:\d{8})")
+okpo_pattern = re.compile(r"(?:\d{8})")
 keyvalue_pattern = re.compile(r"(\w+)\s*[=:]\s*(\w+)")
 
 
@@ -140,6 +141,25 @@ def request_SPV4659(query: str) -> str:
         raise ValueError(f"Некорректный запрос: {query}")
 
 
+def request_EGRPO(query: str) -> str:
+    """Единый Государственный регистр предприятий и организаций"""
+
+    request_template = r"""
+<GetInformNSI>
+<ns0:getTN_EO_EGRPO_SKR xmlns:ns0="http://service.siw.pktbcki.rzd/">
+<ns0:TN_EO_EGRPO_SKRRequest>
+<okpoKod>{0}</okpoKod>
+</ns0:TN_EO_EGRPO_SKRRequest>
+</ns0:getTN_EO_EGRPO_SKR>
+</GetInformNSI>
+    """
+
+    if okpo_pattern.fullmatch(query):
+        return etran_request.format(utils.xml_escape(request_template.format(query)))
+    else:
+        raise ValueError(f"Некорректный код ОКПО: {query}")
+
+
 def request_CarNSI(query: str) -> str:
     """НСИ вагона (АБД ПВ)"""
 
@@ -203,6 +223,7 @@ def request_OrgPayers(query: str) -> str:
 request_map = {
     1: request_SPP4700,
     2: request_SPV4659,
+    50: request_EGRPO,
     100: request_CarNSI,
     101: request_OrgPassport,
     102: request_OrgPayers,
