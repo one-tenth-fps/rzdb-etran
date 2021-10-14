@@ -12,8 +12,8 @@ etran_request = rf"""
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:sys="SysEtranInt">
 <soapenv:Body>
     <sys:GetBlock>
-        <Login>{config.etran_login}</Login>
-        <Password>{config.etran_password}</Password>
+        <Login>{config.ETRAN_LOGIN}</Login>
+        <Password>{config.ETRAN_PASSWORD}</Password>
         <Text>{{0}}</Text>
     </sys:GetBlock>
 </soapenv:Body>
@@ -82,7 +82,7 @@ def request_SPP4700(query: str) -> str:
     """Работа с поездом"""
 
     request_template = rf"""
-<GetInform>{"<UseGZIPBinary>1</UseGZIPBinary>" if config.etran_gzip else ""}
+<GetInform>{"<UseGZIPBinary>1</UseGZIPBinary>" if config.ETRAN_GZIP else ""}
 <ns0:getReferenceSPP4700 xmlns:ns0="http://service.siw.pktbcki.rzd/">
 <ns0:ReferenceSPP4700Request>
 <idUser>0</idUser>
@@ -110,7 +110,7 @@ def request_SPV4659(query: str) -> str:
     """Техническое состояние вагонов"""
 
     request_template = rf"""
-<GetInform>{"<UseGZIPBinary>1</UseGZIPBinary>" if config.etran_gzip else ""}
+<GetInform>{"<UseGZIPBinary>1</UseGZIPBinary>" if config.ETRAN_GZIP else ""}
 <ns0:getReferenceSPV4659 xmlns:ns0="http://service.siw.pktbcki.rzd/">
 <ns0:ReferenceSPV4659Request>
 <idUser>0</idUser>

@@ -34,7 +34,7 @@ async def producer_db(queue_in, queue_out):
     """Наполняет очередь обработки queue_in запросами из БД"""
     task_name = "producer"
 
-    db_conn = await aioodbc.connect(dsn=config.db_connection_string, autocommit=True)
+    db_conn = await aioodbc.connect(dsn=config.DB_CONNECTION_STRING, autocommit=True)
     db_cursor = await db_conn.cursor()
     need_close = True
 
@@ -140,9 +140,9 @@ async def worker(queue_in, queue_out):
             try:
                 start_time = time.time()
                 async with session.post(
-                    config.etran_url,
+                    config.ETRAN_URL,
                     data=request_packet.body,
-                    headers=config.etran_headers,
+                    headers=config.ETRAN_HEADERS,
                 ) as response:
                     response_body = await response.read()
 
@@ -181,7 +181,7 @@ async def consumer_db(queue_in, queue_out):
     global etran_is_down
     task_name = "consumer"
 
-    db_conn = await aioodbc.connect(dsn=config.db_connection_string, autocommit=True)
+    db_conn = await aioodbc.connect(dsn=config.DB_CONNECTION_STRING, autocommit=True)
     db_cursor = await db_conn.cursor()
     need_close = True
 
@@ -275,7 +275,7 @@ async def main():
 
     # при запуске сбрасываем статусы всем ранее взятым, но не обработанным записям
     async with aioodbc.connect(
-        dsn=config.db_connection_string, autocommit=True
+        dsn=config.DB_CONNECTION_STRING, autocommit=True
     ) as db_conn:
         async with db_conn.cursor() as db_cursor:
             await db_cursor.execute("EXEC etran.ResetRequestStatuses")
