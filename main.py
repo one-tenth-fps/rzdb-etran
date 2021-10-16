@@ -41,9 +41,7 @@ async def producer_db(queue_in, queue_out):
     try:
         while True:
             try:
-                await db_cursor.execute(
-                    "EXEC etran.GetRequestQueue @MaxCount=?", config.QUEUE_MAXSIZE
-                )
+                await db_cursor.execute("EXEC etran.GetRequestQueue @MaxCount=?", config.QUEUE_MAXSIZE)
                 # забираем все записи, чтобы не держать курсор, если очередь заполнится
                 rows = await db_cursor.fetchall()
                 for row in rows:
@@ -51,16 +49,12 @@ async def producer_db(queue_in, queue_out):
                     request_type = row.TypeID
                     request_id = row.ID
                     request_priority = row.Priority
-                    logging.info(
-                        f"{task_name} id={request_id} type={request_type} priority={request_priority}"
-                    )
+                    logging.info(f"{task_name} id={request_id} type={request_type} priority={request_priority}")
 
                     # формируем тело запроса в соответствии с его типом
                     try:
                         if request_type in etran_requests.request_map:
-                            request_body = etran_requests.request_map[request_type](
-                                row.Query
-                            )
+                            request_body = etran_requests.request_map[request_type](row.Query)
                         else:
                             raise ValueError(f"Неизвестный тип запроса: {request_type}")
                     except ValueError as e:
@@ -77,9 +71,7 @@ async def producer_db(queue_in, queue_out):
 
                     # отправляем в очередь обработки запросов
                     if request_body is not None:
-                        request_packet = RequestPacket(
-                            request_priority, request_id, request_body, dos_counter=0
-                        )
+                        request_packet = RequestPacket(request_priority, request_id, request_body, dos_counter=0)
                         await queue_in.put(request_packet)
 
                 # цикл работы producer'а закончился; засыпаем, чтобы не тиранить БД
@@ -122,14 +114,16 @@ async def worker(queue_in, queue_out):
             request_packet = await queue_in.get()
             request_id = request_packet.request_id
 
-            # делаем инкрементальную паузу, если запрос повторно оказался в очереди из-за ошибки отказа в обслуживании
             if etran_is_down:
+                # делаем длинную паузу в случае остановки ЭТРАН
                 sleep_for = config.SLEEP_ON_DOS_MAX
             else:
+                # делаем инкрементальную паузу, если запрос повторно оказался в очереди при ошибке отказа в обслуживании
                 sleep_for = min(
                     request_packet.dos_counter * config.SLEEP_ON_DOS,
                     config.SLEEP_ON_DOS_MAX,
                 )
+
             if sleep_for > 0:
                 logging.warning(
                     f"{task_name} id={request_id} going to sleep for {sleep_for}s "
@@ -151,14 +145,16 @@ async def worker(queue_in, queue_out):
 
                     # отправляем в очередь обработки ответов # TODO: пустое тело ответа?
                     logging.info(
-                        f"{task_name} id={request_id}"
-                        f" status={response.status} len={len(response_body)}"
-                        f" duration={(time.time()-start_time)*1000:.0f}ms"
-                        f" queue_in={queue_in.qsize()} queue_out={queue_out.qsize()}"
+                        "%s id=%d status=%s len=%d duration=%.0fms queue_in=%d queue_out=%d",
+                        task_name,
+                        request_id,
+                        response.status,
+                        len(response_body),
+                        (time.time() - start_time) * 1000,
+                        queue_in.qsize(),
+                        queue_out.qsize(),
                     )
-                    response_packet = ResponsePacket(
-                        request_id, False, response_body, request_packet
-                    )
+                    response_packet = ResponsePacket(request_id, False, response_body, request_packet)
                     await queue_out.put(response_packet)
 
             except asyncio.CancelledError:
@@ -196,9 +192,7 @@ async def consumer_db(queue_in, queue_out):
                     response_text = response_packet.body.decode()
                 else:
                     # декодируем ответ
-                    etran_response = etran_requests.decode_response(
-                        response_packet.body
-                    )
+                    etran_response = etran_requests.decode_response(response_packet.body)
                     response_is_error = etran_response.is_error
                     response_text = etran_response.text
 
@@ -208,9 +202,7 @@ async def consumer_db(queue_in, queue_out):
                 elif (
                     response_is_error
                     and response_packet.request_packet is not None
-                    and response_text.startswith(
-                        "400 Дождитесь окончания предыдущего запроса"
-                    )
+                    and response_text.startswith("400 Дождитесь окончания предыдущего запроса")
                 ):
                     # возвращаем запрос в очередь в случае ошибки отказа в обслуживании
                     etran_is_down, return_to_queue = False, True
@@ -233,8 +225,7 @@ async def consumer_db(queue_in, queue_out):
 
                 if return_to_queue:
                     logging.warning(
-                        f"{task_name} id={request_id} returning "
-                        f"to the queue because of {response_text}"
+                        f"{task_name} id={request_id} returning " f"to the queue because of {response_text}"
                     )
                     await queue_in.put(response_packet.request_packet)
 
@@ -274,9 +265,7 @@ async def main():
     await web_site.start()
 
     # при запуске сбрасываем статусы всем ранее взятым, но не обработанным записям
-    async with aioodbc.connect(
-        dsn=config.DB_CONNECTION_STRING, autocommit=True
-    ) as db_conn:
+    async with aioodbc.connect(dsn=config.DB_CONNECTION_STRING, autocommit=True) as db_conn:
         async with db_conn.cursor() as db_cursor:
             await db_cursor.execute("EXEC etran.ResetRequestStatuses")
 
@@ -285,20 +274,15 @@ async def main():
 
     producers = [
         asyncio.create_task(
-            utils.rerun_on_exception(
-                producer_db, queue_in, queue_out, sleep_for=config.SLEEP_ON_DISCONNECT
-            )
+            utils.rerun_on_exception(producer_db, queue_in, queue_out, sleep_for=config.SLEEP_ON_DISCONNECT)
         )
     ]
     workers = [
-        asyncio.create_task(worker(queue_in, queue_out), name=f"worker-{i+1}")
-        for i in range(config.WORKERS_COUNT)
+        asyncio.create_task(worker(queue_in, queue_out), name=f"worker-{i+1}") for i in range(config.WORKERS_COUNT)
     ]
     consumers = [
         asyncio.create_task(
-            utils.rerun_on_exception(
-                consumer_db, queue_in, queue_out, sleep_for=config.SLEEP_ON_DISCONNECT
-            )
+            utils.rerun_on_exception(consumer_db, queue_in, queue_out, sleep_for=config.SLEEP_ON_DISCONNECT)
         )
     ]
     assistants = [asyncio.create_task(heartbeat())]
@@ -363,7 +347,7 @@ if __name__ == "__main__":
     try:
         logging.warning("app start")
         asyncio.run(main())
-    except KeyboardInterrupt as e:
+    except KeyboardInterrupt:
         logging.warning("KeyboardInterrupt")
     except Exception as e:
         logging.error(f"{repr(e)}")

@@ -94,11 +94,7 @@ def request_SPP4700(query: str) -> str:
     """
 
     if m := train_index_pattern1.fullmatch(query):
-        train_index = (
-            f"{utils.get_code6(int(m.group(1)))}"
-            f"{m.group(2)}"
-            f"{utils.get_code6(int(m.group(3)))}"
-        )
+        train_index = f"{utils.get_code6(int(m.group(1)))}" f"{m.group(2)}" f"{utils.get_code6(int(m.group(3)))}"
     elif train_index_pattern2.fullmatch(query):
         train_index = query
     else:
@@ -131,11 +127,7 @@ def request_SPV4659(query: str) -> str:
 
     if len(values) > 0:
         return etran_request.format(
-            utils.xml_escape(
-                request_template.format(
-                    "".join(f"<vagon>{value}</vagon>" for value in values)
-                )
-            )
+            utils.xml_escape(request_template.format("".join(f"<vagon>{value}</vagon>" for value in values)))
         )
     else:
         raise ValueError(f"Некорректный запрос: {query}")

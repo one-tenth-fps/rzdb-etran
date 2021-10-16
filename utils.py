@@ -14,7 +14,7 @@ class CancellableSleep:
         self.tasks.add(task)
         try:
             return await task
-        except asyncio.CancelledError as e:
+        except asyncio.CancelledError:
             if self.terminate:
                 raise
             else:
@@ -39,20 +39,13 @@ async def rerun_on_exception(coro, *args, sleep_for=0, **kwargs):
         except asyncio.CancelledError:
             raise
         except RerunMeException as e:
-            logging.warning(
-                f"rerunning {coro.__name__} after {sleep_for}s sleep because of {repr(e)}"
-            )
+            logging.warning(f"rerunning {coro.__name__} after {sleep_for}s sleep because of {repr(e)}")
             if sleep_for > 0:
                 await asyncio.sleep(sleep_for)
 
 
 def xml_escape(val: str) -> str:
-    return (
-        val.replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
-        .replace("'", "&apos;")
-    )
+    return val.replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&apos;")
 
 
 def get_code6(val: int) -> str:

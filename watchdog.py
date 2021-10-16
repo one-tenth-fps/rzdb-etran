@@ -23,5 +23,5 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except KeyboardInterrupt as e:
+    except KeyboardInterrupt:
         print("KeyboardInterrupt")
