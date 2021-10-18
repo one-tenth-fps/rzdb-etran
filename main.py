@@ -292,7 +292,7 @@ async def main():
 
 
 async def web_handler(request):
-    # эндоинт, за который можно дёрнуть, чтобы разбудить продюсера
+    # эндпоинт, за который можно дёрнуть, чтобы разбудить продюсера
     if request.path == "/wakeup":
         logging.info("waking up the producer")
         db_polling_sleep.cancel_all()
