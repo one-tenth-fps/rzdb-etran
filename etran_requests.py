@@ -94,7 +94,7 @@ def request_SPP4700(query: str) -> str:
     """
 
     if m := train_index_pattern1.fullmatch(query):
-        train_index = f"{utils.get_code6(int(m.group(1)))}" f"{m.group(2)}" f"{utils.get_code6(int(m.group(3)))}"
+        train_index = f"{utils.get_code6(int(m.group(1)))}{m.group(2)}{utils.get_code6(int(m.group(3)))}"
     elif train_index_pattern2.fullmatch(query):
         train_index = query
     else:

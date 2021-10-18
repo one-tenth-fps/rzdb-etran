@@ -224,9 +224,7 @@ async def consumer_db(queue_in, queue_out):
                     )
 
                 if return_to_queue:
-                    logging.warning(
-                        f"{task_name} id={request_id} returning " f"to the queue because of {response_text}"
-                    )
+                    logging.warning(f"{task_name} id={request_id} returning to the queue because of {response_text}")
                     await queue_in.put(response_packet.request_packet)
 
             except pyodbc.Error as e:
