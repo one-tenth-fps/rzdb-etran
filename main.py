@@ -250,14 +250,8 @@ async def consumer_db(queue_in, queue_out):
 
 
 async def main():
-    global producers
-    global workers
-    global consumers
-    global assistants
-
     # HTTP-сервер для получения внешних команд
-    web_server = web.Server(web_handler)
-    web_runner = web.ServerRunner(web_server)
+    web_runner = web.ServerRunner(web.Server(web_handler))
     await web_runner.setup()
     web_site = web.TCPSite(web_runner, "localhost", config.HTTP_ENDPOINT_PORT)
     await web_site.start()
@@ -270,25 +264,22 @@ async def main():
     queue_in = asyncio.PriorityQueue(maxsize=config.QUEUE_MAXSIZE)
     queue_out = asyncio.Queue()
 
-    producers = [
-        asyncio.create_task(
-            utils.rerun_on_exception(producer_db, queue_in, queue_out, sleep_for=config.SLEEP_ON_DISCONNECT)
-        )
-    ]
+    # producers
+    asyncio.create_task(
+        utils.rerun_on_exception(producer_db, queue_in, queue_out, sleep_for=config.SLEEP_ON_DISCONNECT)
+    )
+    # workers
     workers = [
         asyncio.create_task(worker(queue_in, queue_out), name=f"worker-{i+1}") for i in range(config.WORKERS_COUNT)
     ]
-    consumers = [
-        asyncio.create_task(
-            utils.rerun_on_exception(consumer_db, queue_in, queue_out, sleep_for=config.SLEEP_ON_DISCONNECT)
-        )
-    ]
-    assistants = [asyncio.create_task(heartbeat())]
+    # consumers
+    asyncio.create_task(
+        utils.rerun_on_exception(consumer_db, queue_in, queue_out, sleep_for=config.SLEEP_ON_DISCONNECT)
+    )
+    # assistants
+    asyncio.create_task(heartbeat())
 
-    await asyncio.gather(*producers)
-    await queue_in.join()
-    await queue_out.join()
-    await asyncio.gather(*consumers)
+    await asyncio.gather(*workers)
 
 
 async def web_handler(request):
@@ -304,18 +295,6 @@ async def heartbeat():
         with open(config.HEARTBEAT_PATH, "w") as f:
             f.write("")
         await asyncio.sleep(config.HEARTBEAT_INTERVAL)
-
-
-def terminate():
-    db_polling_sleep.cancel_all()
-    for t in producers:
-        t.cancel()
-    for t in workers:
-        t.cancel()
-    for t in consumers:
-        t.cancel()
-    for t in assistants:
-        t.cancel()
 
 
 def signal_handler(sig, frame):
@@ -336,10 +315,6 @@ if __name__ == "__main__":
     db_polling_sleep = utils.CancellableSleep()
     signal.signal(signal.SIGINT, signal_handler)
 
-    producers = []
-    workers = []
-    consumers = []
-    assistants = []
     etran_is_down = False
 
     try:
@@ -349,6 +324,3 @@ if __name__ == "__main__":
         logging.warning("KeyboardInterrupt")
     except Exception as e:
         logging.error(f"{repr(e)}")
-        raise
-    finally:
-        terminate()
