@@ -134,7 +134,7 @@ def request_SPV4659(query: str) -> str:
 
 
 def request_EGRPO(query: str) -> str:
-    """Единый Государственный регистр предприятий и организаций"""
+    """Справочник ЕГРПО"""
 
     request_template = r"""
 <GetInformNSI>
@@ -150,6 +150,36 @@ def request_EGRPO(query: str) -> str:
         return etran_request.format(utils.xml_escape(request_template.format(query)))
     else:
         raise ValueError(f"Некорректный код ОКПО: {query}")
+
+
+def request_Owner(query: str) -> str:
+    """Справочник предприятий собственников вагонов"""
+
+    request_template = r"""
+<GetInformNSI>
+<ns0:getAKPV_PREDSOB xmlns:ns0="http://service.siw.pktbcki.rzd/">
+<ns0:AKPV_PREDSOBRequest>
+{0}
+</ns0:AKPV_PREDSOBRequest>
+</ns0:getAKPV_PREDSOB>
+</GetInformNSI>
+    """
+    request = None
+
+    if digits_pattern.fullmatch(query):
+        request = f"<lC>{query}</lC>"
+    elif m := keyvalue_pattern.fullmatch(query):
+        key, value = m.group(1).lower(), m.group(2)
+        if digits_pattern.fullmatch(value):
+            if key == "id":
+                request = f"<lC>{value}</lC>"
+            elif key == "okpo":
+                request = f"<okpo>{value}</okpo>"
+
+    if request is None:
+        raise ValueError(f"Некорректный запрос: {query}")
+    else:
+        return etran_request.format(utils.xml_escape(request_template.format(request)))
 
 
 def request_CarNSI(query: str) -> str:
@@ -216,6 +246,7 @@ request_map = {
     1: request_SPP4700,
     2: request_SPV4659,
     50: request_EGRPO,
+    51: request_Owner,
     100: request_CarNSI,
     101: request_OrgPassport,
     102: request_OrgPayers,
