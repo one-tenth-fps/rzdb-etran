@@ -8,7 +8,7 @@ from lxml import etree
 import config
 import utils
 
-etran_request = rf"""
+etran_template = rf"""
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:sys="SysEtranInt">
 <soapenv:Body>
     <sys:GetBlock>
@@ -81,7 +81,6 @@ def decode_response(response: bytes) -> ETRANResponse:
 
 def request_SPP4700(query: str) -> str:
     """Работа с поездом"""
-
     request_template = rf"""
 <GetInform>{"<UseGZIPBinary>1</UseGZIPBinary>" if config.ETRAN_GZIP else ""}
 <ns0:getReferenceSPP4700 xmlns:ns0="http://service.siw.pktbcki.rzd/">
@@ -100,12 +99,11 @@ def request_SPP4700(query: str) -> str:
     else:
         raise ValueError(f"Некорректный формат индекса поезда: {query}")
 
-    return etran_request.format(utils.xml_escape(request_template.format(train_index)))
+    return etran_template.format(utils.xml_escape(request_template.format(train_index)))
 
 
 def request_SPV4659(query: str) -> str:
     """Техническое состояние вагонов"""
-
     request_template = rf"""
 <GetInform>{"<UseGZIPBinary>1</UseGZIPBinary>" if config.ETRAN_GZIP else ""}
 <ns0:getReferenceSPV4659 xmlns:ns0="http://service.siw.pktbcki.rzd/">
@@ -116,17 +114,18 @@ def request_SPV4659(query: str) -> str:
 </ns0:getReferenceSPV4659>
 </GetInform>
     """
-    values = []
+    values = set()
 
-    for value in (value.strip() for value in query.split(",")):
-        if len(value) > 0:
-            if carnumber_pattern.fullmatch(value):
-                values.append(int(value))
-            else:
-                raise ValueError(f"Некорректный номер вагона: {value}")
+    for value in map(str.strip, query.split(",")):
+        if not len(value):
+            pass
+        elif carnumber_pattern.fullmatch(value):
+            values.add(int(value))
+        else:
+            raise ValueError(f"Некорректный номер вагона: {value}")
 
-    if len(values) > 0:
-        return etran_request.format(
+    if len(values):
+        return etran_template.format(
             utils.xml_escape(request_template.format("".join(f"<vagon>{value}</vagon>" for value in values)))
         )
     else:
@@ -135,7 +134,6 @@ def request_SPV4659(query: str) -> str:
 
 def request_EGRPO(query: str) -> str:
     """Справочник ЕГРПО"""
-
     request_template = r"""
 <GetInformNSI>
 <ns0:getTN_EO_EGRPO_SKR xmlns:ns0="http://service.siw.pktbcki.rzd/">
@@ -147,14 +145,13 @@ def request_EGRPO(query: str) -> str:
     """
 
     if okpo_pattern.fullmatch(query):
-        return etran_request.format(utils.xml_escape(request_template.format(query)))
+        return etran_template.format(utils.xml_escape(request_template.format(query)))
     else:
         raise ValueError(f"Некорректный код ОКПО: {query}")
 
 
 def request_Owner(query: str) -> str:
     """Справочник предприятий собственников вагонов"""
-
     request_template = r"""
 <GetInformNSI>
 <ns0:getAKPV_PREDSOB xmlns:ns0="http://service.siw.pktbcki.rzd/">
@@ -179,12 +176,11 @@ def request_Owner(query: str) -> str:
     if request is None:
         raise ValueError(f"Некорректный запрос: {query}")
     else:
-        return etran_request.format(utils.xml_escape(request_template.format(request)))
+        return etran_template.format(utils.xml_escape(request_template.format(request)))
 
 
 def request_CarNSI(query: str) -> str:
     """НСИ вагона (АБД ПВ)"""
-
     request_template = r"""
 <getCarNSI version="1.0">
 <car><carNumber value="{0}"/></car>
@@ -192,14 +188,13 @@ def request_CarNSI(query: str) -> str:
     """
 
     if carnumber_pattern.fullmatch(query):
-        return etran_request.format(utils.xml_escape(request_template.format(query)))
+        return etran_template.format(utils.xml_escape(request_template.format(query)))
     else:
         raise ValueError(f"Некорректный номер вагона: {query}")
 
 
 def request_OrgPassport(query: str) -> str:
     """Паспорт организации (ПУЖТ)"""
-
     request_template = r"""
 <getOrgPassport version="1.0">
 {0}
@@ -224,7 +219,7 @@ def request_OrgPassport(query: str) -> str:
     if request is None:
         raise ValueError(f"Некорректный запрос: {query}")
     else:
-        return etran_request.format(utils.xml_escape(request_template.format(request)))
+        return etran_template.format(utils.xml_escape(request_template.format(request)))
 
 
 def request_OrgPayers(query: str) -> str:
@@ -236,7 +231,7 @@ def request_OrgPayers(query: str) -> str:
     """
 
     if digits_pattern.fullmatch(query):
-        return etran_request.format(utils.xml_escape(request_template.format(query)))
+        return etran_template.format(utils.xml_escape(request_template.format(query)))
     else:
         raise ValueError(f"Некорректный формат запроса: {query}")
 
