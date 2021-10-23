@@ -245,7 +245,7 @@ async def reset_db_queue():
     """Сбрасывает статусы в БД всем ранее взятым, но не обработанным записям"""
     async with aioodbc.connect(dsn=config.DB_CONNECTION_STRING, autocommit=True) as db_conn:
         async with db_conn.cursor() as db_cursor:
-            await db_cursor.execute("EXEC etran.ResetRequestStatuses")
+            await db_cursor.execute("EXEC etran.ResetProcessingQueue")
 
 
 async def init_web_server():
