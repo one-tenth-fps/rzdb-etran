@@ -25,7 +25,7 @@ train_index_pattern2 = re.compile(r"(?:\d{15})")
 xmlns_pattern = re.compile(r"(?:<root.*?>)")
 digits_pattern = re.compile(r"(?:\d+)")
 carnumber_pattern = re.compile(r"(?:\d{8})")
-okpo_pattern = re.compile(r"(?:\d{8})")
+okpo_pattern = re.compile(r"(?:\d{1,8})")
 keyvalue_pattern = re.compile(r"(\w+)\s*[=:]\s*(\w+)")
 
 
