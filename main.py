@@ -38,41 +38,40 @@ async def producer_db(db_cursor, queue_in, queue_out):
         try:
             # Запрашиваем ровно недостающее до полной очереди количество записей. Это нужно на случай, если неожиданно
             # придут высокоприоритетные запросы, чтобы они быстро, как только освободятся воркеры, попали в очередь.
-            if (batch_size := config.QUEUE_MAXSIZE - queue_in.qsize()) <= 0:
-                batch_size = config.WORKERS_COUNT
-            await db_cursor.execute("EXEC etran.GetRequestQueue @MaxCount=?", batch_size)
-            rows = await db_cursor.fetchall()
-            for row in rows:
-                request_id, request_type, request_priority, request_body = row.ID, row.TypeID, row.Priority, None
-                logging.info(f"{task_name} id={request_id} type={request_type} priority={request_priority}")
+            if (batch_size := config.QUEUE_MAXSIZE - queue_in.qsize()) > 0:
+                await db_cursor.execute("EXEC etran.GetRequestQueue @MaxCount=?", batch_size)
+                rows = await db_cursor.fetchall()
+                for row in rows:
+                    request_id, request_type, request_priority, request_body = row.ID, row.TypeID, row.Priority, None
+                    logging.info(f"{task_name} id={request_id} type={request_type} priority={request_priority}")
 
-                # формируем тело запроса в соответствии с его типом
-                try:
-                    if request_type in etran_requests.request_map:
-                        request_body = etran_requests.request_map[request_type](row.Query)
-                    else:
-                        raise ValueError(f"Неизвестный тип запроса: {request_type}")
-                except ValueError as e:
-                    # чтобы не получать некорректный запрос бесконечно, сразу помещаем ошибку в очередь ответов
-                    logging.warning(f"{task_name} id={request_id} {repr(e)}")
-                    await queue_out.put(
-                        ResponsePacket(
-                            request_id,
-                            is_error=True,
-                            body=repr(e).encode(),
-                            request_packet=None,
+                    # формируем тело запроса в соответствии с его типом
+                    try:
+                        if request_type in etran_requests.request_map:
+                            request_body = etran_requests.request_map[request_type](row.Query)
+                        else:
+                            raise ValueError(f"Неизвестный тип запроса: {request_type}")
+                    except ValueError as e:
+                        # чтобы не получать некорректный запрос бесконечно, сразу помещаем ошибку в очередь ответов
+                        logging.warning(f"{task_name} id={request_id} {repr(e)}")
+                        await queue_out.put(
+                            ResponsePacket(
+                                request_id,
+                                is_error=True,
+                                body=repr(e).encode(),
+                                request_packet=None,
+                            )
                         )
-                    )
 
-                # отправляем в очередь обработки запросов
-                if request_body is not None:
-                    request_packet = RequestPacket(request_priority, request_id, request_body, dos_counter=0)
-                    await queue_in.put(request_packet)
+                    # отправляем в очередь обработки запросов
+                    if request_body is not None:
+                        request_packet = RequestPacket(request_priority, request_id, request_body, dos_counter=0)
+                        await queue_in.put(request_packet)
 
-            # цикл работы producer'а закончился; засыпаем, чтобы не тиранить БД
-            sleep_for = config.DB_QUERYING_INTERVAL if len(rows) else config.DB_POLLING_INTERVAL
-            logging.info(f"{task_name} going to sleep for {sleep_for}s")
-            await db_polling_sleep.sleep(sleep_for)
+                # цикл работы producer'а закончился; засыпаем, чтобы не тиранить БД
+                sleep_for = config.DB_QUERYING_INTERVAL if len(rows) else config.DB_POLLING_INTERVAL
+                logging.info(f"{task_name} going to sleep for {sleep_for}s")
+                await db_polling_sleep.sleep(sleep_for)
 
         except Exception as e:
             logging.error(f"{task_name} {repr(e)}")
