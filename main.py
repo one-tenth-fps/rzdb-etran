@@ -38,7 +38,9 @@ async def producer_db(db_cursor, queue_in, queue_out):
         try:
             # Запрашиваем ровно недостающее до полной очереди количество записей. Это нужно на случай, если неожиданно
             # придут высокоприоритетные запросы, чтобы они быстро, как только освободятся воркеры, попали в очередь.
-            await db_cursor.execute("EXEC etran.GetRequestQueue @MaxCount=?", config.QUEUE_MAXSIZE - queue_in.qsize())
+            if (batch_size := config.QUEUE_MAXSIZE - queue_in.qsize()) <= 0:
+                batch_size = config.WORKERS_COUNT
+            await db_cursor.execute("EXEC etran.GetRequestQueue @MaxCount=?", batch_size)
             rows = await db_cursor.fetchall()
             for row in rows:
                 request_id, request_type, request_priority, request_body = row.ID, row.TypeID, row.Priority, None
