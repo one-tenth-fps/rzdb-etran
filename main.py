@@ -68,10 +68,10 @@ async def producer_db(db_cursor, queue_in, queue_out):
                         request_packet = RequestPacket(request_priority, request_id, request_body, dos_counter=0)
                         await queue_in.put(request_packet)
 
-                # цикл работы producer'а закончился; засыпаем, чтобы не тиранить БД
-                sleep_for = config.DB_QUERYING_INTERVAL if len(rows) else config.DB_POLLING_INTERVAL
-                logging.info(f"{task_name} going to sleep for {sleep_for}s")
-                await db_polling_sleep.sleep(sleep_for)
+            # цикл работы producer'а закончился; засыпаем, чтобы не тиранить БД
+            sleep_for = config.DB_QUERYING_INTERVAL if len(rows) else config.DB_POLLING_INTERVAL
+            logging.info(f"{task_name} going to sleep for {sleep_for}s")
+            await db_polling_sleep.sleep(sleep_for)
 
         except Exception as e:
             logging.error(f"{task_name} {repr(e)}")
