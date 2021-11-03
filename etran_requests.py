@@ -27,6 +27,7 @@ digits_pattern = re.compile(r"(?:\d+)")
 carnumber_pattern = re.compile(r"(?:\d{8})")
 okpo_pattern = re.compile(r"(?:\d{1,8})")
 keyvalue_pattern = re.compile(r"(\w+)\s*[=:]\s*(\w+)")
+carpart_pattern = re.compile(r"(\d{1})-(\d{1,10})-(\d{1,4})-(\d{4})")
 
 
 @dataclass
@@ -130,6 +131,32 @@ def request_SPV4659(query: str) -> str:
         )
     else:
         raise ValueError(f"Некорректный запрос: {query}")
+
+
+def request_SPV4716(query: str) -> str:
+    """Сведения о текущем состоянии детали"""
+    request_template = rf"""
+<GetInform>{"<UseGZIPBinary>1</UseGZIPBinary>" if config.ETRAN_GZIP else ""}
+<ns0:getReferenceSPP4716 xmlns:ns0="http://service.siw.pktbcki.rzd/">
+<ns0:ReferenceSPP4716Request>
+<idUser>0</idUser>
+<tipDet>{{0}}</tipDet>
+<zavod>{{1}}</zavod>
+<nomDet>{{2}}</nomDet>
+<godPost>{{3}}</godPost>
+</ns0:ReferenceSPP4716Request>
+</ns0:getReferenceSPP4716>
+</GetInform>
+    """
+
+    if m := carpart_pattern.fullmatch(query):
+        part_type, part_number, part_factory, part_year = m.group(1, 2, 3, 4)
+    else:
+        raise ValueError(f"Некорректный формат номера детали: {query}")
+
+    return etran_template.format(
+        utils.xml_escape(request_template.format(part_type, part_factory, part_number, part_year))
+    )
 
 
 def request_EGRPO(query: str) -> str:
@@ -240,6 +267,7 @@ def request_OrgPayers(query: str) -> str:
 request_map = {
     1: request_SPP4700,
     2: request_SPV4659,
+    3: request_SPV4716,
     50: request_EGRPO,
     51: request_Owner,
     100: request_CarNSI,
