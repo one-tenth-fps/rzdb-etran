@@ -134,18 +134,18 @@ def request_SPV4659(query: str) -> str:
 
 
 def request_SPV4716(query: str) -> str:
-    """Сведения о текущем состоянии детали"""
+    """Текущее состояние детали"""
     request_template = rf"""
 <GetInform>{"<UseGZIPBinary>1</UseGZIPBinary>" if config.ETRAN_GZIP else ""}
-<ns0:getReferenceSPP4716 xmlns:ns0="http://service.siw.pktbcki.rzd/">
-<ns0:ReferenceSPP4716Request>
+<ns0:getReferenceSPV4716 xmlns:ns0="http://service.siw.pktbcki.rzd/">
+<ns0:ReferenceSPV4716Request>
 <idUser>0</idUser>
 <tipDet>{{0}}</tipDet>
 <zavod>{{1}}</zavod>
 <nomDet>{{2}}</nomDet>
 <godPost>{{3}}</godPost>
-</ns0:ReferenceSPP4716Request>
-</ns0:getReferenceSPP4716>
+</ns0:ReferenceSPV4716Request>
+</ns0:getReferenceSPV4716>
 </GetInform>
     """
 
