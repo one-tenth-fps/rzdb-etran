@@ -255,7 +255,7 @@ async def init_web_server():
     logging.info(f"starting HTTP server on port {config.HTTP_ENDPOINT_PORT}")
     web_runner = web.ServerRunner(web.Server(web_handler))
     await web_runner.setup()
-    web_site = web.TCPSite(web_runner, "localhost", config.HTTP_ENDPOINT_PORT)
+    web_site = web.TCPSite(web_runner, '0.0.0.0', config.HTTP_ENDPOINT_PORT)
     await web_site.start()
 
 
