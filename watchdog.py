@@ -9,7 +9,7 @@ def main():
         try:
             if (
                 time.time() - os.path.getmtime(config.HEARTBEAT_PATH)
-                > config.HEARTBEAT_INTERVAL * 2.2
+                > config.HEARTBEAT_INTERVAL * config.HEARTBEAT_MULTIPLIER
             ):
                 print("restarting service")
                 os.system(f"net stop {config.SERVICE_NAME} & net start {config.SERVICE_NAME}")
