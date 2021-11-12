@@ -1,0 +1,16 @@
+[Unit]
+Description=rzdb-etran service
+KillSignal=SIGINT
+WatchdogSignal=SIGINT
+
+[Service]
+WorkingDirectory=~
+ExecStart=/home/rzdb-etran/env/bin/python3.10 /home/rzdb-etran/main.py
+Environment=PYTHONUNBUFFERED=1
+Type=simple
+User=rzdb-etran
+Restart=always
+WatchdogSec=35
+
+[Install]
+WantedBy=multi-user.target
