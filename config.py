@@ -10,6 +10,7 @@ SLEEP_ON_DOS = config["app"]["SLEEP_ON_DOS"]
 SLEEP_ON_DOS_MAX = config["app"]["SLEEP_ON_DOS_MAX"]
 DB_POLLING_INTERVAL = config["app"]["DB_POLLING_INTERVAL"]
 DB_QUERYING_INTERVAL = config["app"]["DB_QUERYING_INTERVAL"]
+DB_ENCRYPT = config["app"]["DB_ENCRYPT"]
 REQUEST_TIMEOUT = config["app"]["REQUEST_TIMEOUT"]
 HEARTBEAT_INTERVAL = config["app"]["HEARTBEAT_INTERVAL"]
 HEARTBEAT_MULTIPLIER = config["app"]["HEARTBEAT_MULTIPLIER"]
@@ -23,7 +24,8 @@ DB_SERVER = config["db"]["server"]
 DB_USER = config["db"]["user"]
 DB_PASSWORD = config["db"]["password"]
 DB_DATABASE = config["db"]["database"]
-DB_CONNECTION_STRING = f"DRIVER={DB_DRIVER};SERVER={DB_SERVER};DATABASE={DB_DATABASE};UID={DB_USER};PWD={DB_PASSWORD}"
+DB_CONNECTION_STRING = f"DRIVER={DB_DRIVER};SERVER={DB_SERVER};DATABASE={DB_DATABASE};UID={DB_USER};PWD={DB_PASSWORD}"\
+                       f"{';Encrypt=YES;TrustServerCertificate=YES' if DB_ENCRYPT else ''}"
 
 ETRAN_LOGIN = config["etran"]["login"]
 ETRAN_PASSWORD = config["etran"]["password"]
