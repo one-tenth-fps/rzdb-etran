@@ -13,6 +13,11 @@ import config
 import etran_requests
 import utils
 
+try:
+    import systemd.daemon as systemd
+except ImportError:
+    systemd = None
+
 
 @dataclass(order=True)
 class RequestPacket:
@@ -270,11 +275,16 @@ async def web_handler(request):
 
 async def heartbeat():
     """Подаёт признаки жизни для сторожевого таймера"""
+    global heartbeat_to_file
+
     while True:
         logging.info("heartbeat")
-        # TODO: неблокирующая работа с FS
-        with open(config.HEARTBEAT_PATH, "w") as f:
-            f.write("")
+        if systemd:
+            systemd.daemon.notify("WATCHDOG=1")
+        else:
+            # TODO: неблокирующая работа с FS
+            with open(config.HEARTBEAT_PATH, "w") as f:
+                f.write("")
         await asyncio.sleep(config.HEARTBEAT_INTERVAL)
 
 
