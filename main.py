@@ -80,6 +80,7 @@ async def producer_db(db_cursor, queue_in, queue_out):
 
         except Exception as e:
             logging.error(f"{task_name} {repr(e)}")
+
             if isinstance(e, pyodbc.Error):
                 raise_on_pyodbc_disconnect(e)
 
@@ -140,14 +141,19 @@ async def worker(queue_in, queue_out):
                     response_packet = ResponsePacket(request_id, False, response_body, request_packet)
                     await queue_out.put(response_packet)
 
-            except aiohttp.ClientError as e:
-                # в случае сетевой ошибки возвращаем запрос в очередь и делаем паузу
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                # в случае сетевой ошибки или таймаута возвращаем запрос в очередь и делаем паузу
                 logging.warning(
                     f"{task_name} id={request_id} going to sleep for "
                     f"{config.SLEEP_ON_DISCONNECT}s because of {repr(e)}"
                 )
                 await queue_in.put(request_packet)
                 await asyncio.sleep(config.SLEEP_ON_DISCONNECT)
+
+            except Exception as e:
+                # этот код не должен выполняться, оставлен для отладки
+                logging.error(f"{task_name} {repr(e)}")
+                await queue_in.put(request_packet)
 
             # задачу нужно завершить при любом, даже неудачном исходе, иначе join() повиснет
             queue_in.task_done()
@@ -179,6 +185,8 @@ async def consumer_db(db_cursor, queue_in, queue_out):
 
         except Exception as e:
             logging.error(f"{task_name} {repr(e)}")
+            await queue_out.put(response_packet)
+
             if isinstance(e, pyodbc.Error):
                 raise_on_pyodbc_disconnect(e)
 
@@ -207,6 +215,7 @@ async def db_runner(coro, *args, **kwargs):
             need_close = False
             logging.warning(f"rerunning {coro.__name__} after {config.SLEEP_ON_DISCONNECT}s sleep because of {repr(e)}")
             await asyncio.sleep(config.SLEEP_ON_DISCONNECT)
+
         finally:
             # не пытаемся закрыть прерванное соединение
             if need_close:
@@ -260,7 +269,7 @@ async def init_web_server():
     logging.info(f"starting HTTP server on port {config.HTTP_ENDPOINT_PORT}")
     web_runner = web.ServerRunner(web.Server(web_handler))
     await web_runner.setup()
-    web_site = web.TCPSite(web_runner, '0.0.0.0', config.HTTP_ENDPOINT_PORT)
+    web_site = web.TCPSite(web_runner, "0.0.0.0", config.HTTP_ENDPOINT_PORT)
     await web_site.start()
 
 
