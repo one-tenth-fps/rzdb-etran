@@ -275,8 +275,6 @@ async def web_handler(request):
 
 async def heartbeat():
     """Подаёт признаки жизни для сторожевого таймера"""
-    global heartbeat_to_file
-
     while True:
         logging.info("heartbeat")
         if systemd:
