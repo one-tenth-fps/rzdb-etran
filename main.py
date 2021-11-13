@@ -141,8 +141,8 @@ async def worker(queue_in, queue_out):
                     response_packet = ResponsePacket(request_id, False, response_body, request_packet)
                     await queue_out.put(response_packet)
 
-            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
-                # в случае сетевой ошибки или таймаута возвращаем запрос в очередь и делаем паузу
+            except aiohttp.ClientError as e:
+                # в случае сетевой ошибки возвращаем запрос в очередь и делаем паузу
                 logging.warning(
                     f"{task_name} id={request_id} going to sleep for "
                     f"{config.SLEEP_ON_DISCONNECT}s because of {repr(e)}"
@@ -150,8 +150,7 @@ async def worker(queue_in, queue_out):
                 await queue_in.put(request_packet)
                 await asyncio.sleep(config.SLEEP_ON_DISCONNECT)
 
-            except Exception as e:
-                # этот код не должен выполняться, оставлен для отладки
+            except (asyncio.TimeoutError, Exception) as e:
                 logging.error(f"{task_name} {repr(e)}")
                 await queue_in.put(request_packet)
 
