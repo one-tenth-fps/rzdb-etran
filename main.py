@@ -150,7 +150,12 @@ async def worker(queue_in, queue_out):
                 await queue_in.put(request_packet)
                 await asyncio.sleep(config.SLEEP_ON_DISCONNECT)
 
-            except (asyncio.TimeoutError, Exception) as e:
+            except asyncio.TimeoutError:
+                logging.warning(f"{task_name} id={request_id} timed out")
+                await queue_in.put(request_packet)
+
+            except Exception as e:
+                # этот код не должен выполняться, оставлен для отладки
                 logging.error(f"{task_name} {repr(e)}")
                 await queue_in.put(request_packet)
 
