@@ -189,6 +189,36 @@ def request_SPV4650(query: str) -> str:
         raise ValueError(f"Некорректный запрос: {query}")
 
 
+def request_SPV4712(query: str) -> str:
+    """Выполненные ремонты вагонов (SPV4712)"""
+    request_template = rf"""
+<GetInform>{"<UseGZIPBinary>1</UseGZIPBinary>" if config.ETRAN_GZIP else ""}
+<ns0:getReferenceSPV4712 xmlns:ns0="http://service.siw.pktbcki.rzd/">
+<ns0:ReferenceSPV4712Request>
+<idUser>0</idUser>
+<vagons>{{0}}</vagons>
+</ns0:ReferenceSPV4712Request>
+</ns0:getReferenceSPV4712>
+</GetInform>
+    """
+    values = set()
+
+    for value in map(str.strip, query.split(",")):
+        if not len(value):
+            pass
+        elif carnumber_pattern.fullmatch(value):
+            values.add(int(value))
+        else:
+            raise ValueError(f"Некорректный номер вагона: {value}")
+
+    if len(values):
+        return etran_template.format(
+            utils.xml_escape(request_template.format("".join(f"<vagon>{value}</vagon>" for value in values)))
+        )
+    else:
+        raise ValueError(f"Некорректный запрос: {query}")
+
+
 def request_EGRPO(query: str) -> str:
     """Справочник ЕГРПО"""
     request_template = r"""
@@ -299,6 +329,7 @@ request_map = {
     2: request_SPV4659,
     3: request_SPV4716,
     4: request_SPV4650,
+    5: request_SPV4712,
     50: request_EGRPO,
     51: request_Owner,
     100: request_CarNSI,
