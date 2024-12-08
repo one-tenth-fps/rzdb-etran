@@ -64,8 +64,11 @@ def decode_response(response: bytes) -> ETRANResponse:
             if root.findtext("returnCode") != "0":
                 is_error, text = True, root.findtext("errorMessage")
             else:
-                # referenceSPXXXXX
-                root = root[0]
+                if root[0].tag in {"referenceEDOK_SPR2730_1"}:
+                    pass
+                else:
+                    # referenceSPXXXXX
+                    root = root[0]
                 root.tag = "root"
                 text = etree.tostring(root, encoding="UTF-8").decode()
                 # убираем мусорные namespace'ы
